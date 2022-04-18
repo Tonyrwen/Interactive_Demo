@@ -1,0 +1,213 @@
+---
+title: "Plotly Demo"
+author: "Tony Wen"
+date: "4/13/2022"
+output: html_document
+---
+
+##### package deposit
+```{r}
+library(tidyverse); library(ggplot2)
+
+library(plotly); library(shiny)
+```
+
+## `ggplotly()`
+### `BeerPrice.csv` Demo
+
+```{r}
+BP = read.csv("https://raw.githubusercontent.com/nazzstat/DataVisualization/master/BeerPrices.csv")
+```
+
++ baseline ggplot
+```{r}
+ggplot(BP)+
+  geom_point(aes(x = Year, y = Price.per.Ounce))
+```
+
++ wrap baseline plot in `ggplotly()`
+```{r}
+ggplotly(
+  
+  ggplot(BP)+
+  geom_point(aes(x = Year, y = Price.per.Ounce))
+  
+)
+```
+
++ customize popup labels
+```{r}
+ggplotly(
+  
+  ggplot(BP)+
+  geom_point(aes(x = Year, y = Price.per.Ounce,
+                 text = paste("Team:", Team,
+                              "<br>City:", City))),
+  
+  # dictate what shows up in the pop up
+  tooltip = "text"
+  
+)
+```
+
++ Create Interactive Elements Based on Plotly Hover in Shiny
+```{r}
+ui = fluidPage(
+  plotlyOutput("plotly"),
+  tableOutput("HoverTable")
+)
+
+server = function(input, output){
+  
+  output$plotly = renderPlotly(
+    {
+      ggplotly(
+        ggplot(BP)+
+          geom_point(aes(x = Year, y = Price.per.Ounce,
+                         text = paste("Team:", Team,
+                                      "<br>City:", City,
+                                      "<br>Price per Beer:", Price))),
+        tooltip = "text",
+        source = "main"
+      )
+    }
+  )
+  
+  output$HoverTable = renderTable(
+    {
+      eventdat = event_data("plotly_hover", source = "main")
+      
+      # default with no hover 
+      if(is.null(eventdat) == T) return (NULL)
+      
+      # store the hover coordinates
+      x = as.numeric(eventdat[["x"]])
+      y = as.numeric(eventdat[["y"]])
+      
+      # use the coordinates for filtering
+      BP %>%
+        filter(Price.per.Ounce == y, Year == x)
+      
+    }
+  )
+  
+}
+
+
+shinyApp(ui, server)
+```
+
+
+### `Spotify` Demo
+```{r}
+oneD = read.csv("https://raw.githubusercontent.com/nazzstat/DataVisualization/master/one_direction.csv",stringsAsFactors=FALSE)
+```
+
+```{r}
+glimpse(oneD)
+```
+
++
+```{r}
+ggplotly(
+  ggplot(oneD)+
+    geom_point(aes(x = tempo, y = danceability, color = popularity,
+                   text = paste("Title:", name,
+                                "<br>Artist:", artists,
+                                "<br> Year:", year,
+                                "<br>Popularity:", popularity)))+
+    geom_smooth(aes(x = tempo, y = danceability), se = F, color = "black", lwd = 0.5)+
+    scale_color_distiller("popularity", palette = "RdPu", direction = 1),
+  tooltip = "text"
+)
+```
+
++ Construct a shiny with ploty that display annual song popularity
+```{r eval = F}
+ui = fluidPage(
+  plotlyOutput("mainplot"),
+  textOutput("test"),
+  plotOutput("AnnualRank")
+)
+
+server = function(input, output){
+  
+  output$mainplot = renderPlotly(
+    {
+      ggplotly(
+        ggplot(oneD)+
+          geom_point(aes(x = tempo, y = danceability, color = popularity,
+                         text = paste("Title:", name,
+                                      "<br>Artist:", artists,
+                                      "<br> Year:", year,
+                                      "<br>Popularity:", popularity)))+
+          geom_smooth(aes(x = tempo, y = danceability), 
+                      se = F, color = "black", lwd = 0.5)+
+          scale_color_distiller("popularity", palette = "RdPu",
+                                direction = 1),
+        tooltip = "text",
+        source = "main"
+      )
+    }
+  )
+  output$AnnualRank = renderPlot({
+    event_dat = event_data("plotly_hover", source = "main")
+    
+    # default
+    if(is.null(event_dat) == T) return(NULL)
+    
+    
+    
+    oneD %>% 
+      filter(danceability == as.numeric(event_dat[['y']]),
+             tempo == as.numeric(event_dat[['x']])) %>%
+      pull(year) -> YoI
+    
+    oneD %>% 
+      filter(year == YoI) %>% 
+      select(name, popularity) %>%
+      arrange(desc(popularity)) %>%
+      
+    
+    }
+  })
+}
+
+shinyApp(ui, server)
+```
+
+***
+***
+
+## `plot_ly()`
++ plot directly in plotly w. slightly different syntax
++ Plot types specified by `type`:
+  + "box"
+  + "bar"
+  + "scatter"
+  <br> specify `mode = lines` for line graph
+  <br> specify `mode = markers` for scatterplot
+  + "scatter3d"
+  + for Matrix Data
+    + "heatmap"
+    + "surface"
+
+#### Demo
+```{r}
+plot_ly(txhousing,
+        x = ~listings,
+        y = ~volume,
+        z = ~year,
+        color = ~median,
+        size = ~median,
+        type = "scatter3d", # type = c("box", "bar", "heatmap", "surface")
+        mode = "markers",
+        text = ~city,
+        hoverinfo = "text")
+```
+
+
+```{r}
+txhousing %>% head()
+```
+
